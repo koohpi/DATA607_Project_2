@@ -1,0 +1,713 @@
+---
+title: "DATA 607 - Project II"
+author: "Koohyar Pooladvand <- K00hPy"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data preparation
+
+The purpose of this assignment is to gain practice in preparing
+different datasets for downstream analysis. The project consists of
+three main steps, and this R Markdown document follows the steps as
+requested.
+
+**#1: Dataset Selection and Import:**
+
+I have chosen three datasets: cancer-poverty, consumer index, and air
+quality. These datasets initially appeared interesting and relevant to
+my topic of interest cancer and poverty. I prefer using the “wide”
+dataset format, and I’ve decided to work with a combination of wide and
+log transformations for this project.
+
+**#2: Tasks for Each Dataset:**
+
+1.  Create a .CSV file (or optionally, a MySQL database) that includes
+    all the information from the dataset.
+
+2.  The goal is to practice tidying and transformations, as described
+    below.
+
+**#3: Data Tidying and Transformation:**
+
+1.  Read the information from your .CSV file into R.
+
+2.  Utilize tidyr and dplyr as needed to tidy and transform the data.
+
+3.  Provide detailed narrative descriptions of the steps taken,
+    explaining why and how each transformation was performed.
+
+4.  Include information on data cleanup, analysis, and conclusions.
+
+## Step 1: Choosing and importing datasets
+
+The first step is to choose and bring in data. I chose my own database.
+I'm interested in cancer and want to see if it's related to things like
+poverty, lifestyle, diet, or other factors in life.
+
+-   [Cancer-Poverty
+    databases](https://bbhosted.cuny.edu/webapps/discussionboard/do/message?action=list_messages&course_id=_2364487_1&nav=discussion_board_entry&conf_id=_2870031_1&forum_id=_3919091_1&message_id=_72489402_1)
+    and original
+    [data](https://data.world/nrippner/cancer-linear-regression-model-tutorial)
+
+My next pick is Guillermo Schneider's data about the consumer price
+index. This also connects to my interest in poverty and lifestyle, and
+it's the kind of info I'm really interested in. The data looks
+intriguing and I'm excited to spend time analyzing and understanding it.
+
+-   [Consumer Price
+    Index](https://bbhosted.cuny.edu/webapps/discussionboard/do/message?action=list_messages&course_id=_2364487_1&nav=discussion_board_entry&conf_id=_2870031_1&forum_id=_3919091_1&message_id=_72377237_1)
+    and original
+    [data](https://www.bls.gov/cpi/tables/supplemental-files/home.htm)
+
+My third choice is Anthony Conrardy's data on NYC air quality. This data
+could also be linked to cancer, so I want to see if poor air quality
+might be causing cancer or other illnesses.
+
+-   [NYC Air
+    Quality](https://bbhosted.cuny.edu/webapps/discussionboard/do/message?action=list_messages&course_id=_2364487_1&nav=discussion_board_entry&conf_id=_2870031_1&forum_id=_3919091_1&message_id=_72332750_1)
+    and original
+    [data](https://data.cityofnewyork.us/Environment/Air-Quality/c3uy-2p5r/about_data)
+
+I hope my choices make sense. I plan to connect these datasets and work
+on them together in the future as a project of mine.
+
+### #1: Importing datasets to RStudio
+
+I am trying to load data from the local files that are stored in my Data
+folder.
+
+Here is my code, it follows the same structure practiced in the previous
+assignments ans some new tricks used in between:
+
+```{r pressure, echo=FALSE}
+
+#code initialization 
+required_packages <- c("RSQLite","devtools","tidyverse","DBI","dplyr","odbc","openintro","ggplot2","psych","reshape2","knitr","markdown","shiny","R.rsp","fivethirtyeight","RCurl", "stringr","readr","glue","data.table", "hflights", "moments") # Specify packages
+
+not_installed <- required_packages[!(required_packages %in% installed.packages()[ , "Package"])]# Extract not installed packages
+if(length(not_installed)==0){
+  print("All required packages are installed")
+} else {
+  print(paste(length(not_installed), "package(s) had to be installed.")) # print the list of packages that need to be isstall
+  install.packages(not_installed)
+}
+#end of code initialization
+
+#Load relevant library 
+library(tidyverse)
+library(stringr)
+library(dplyr)
+library(moments)
+library(stringr)
+
+#links to databases on web 
+airquality_web <- "https://data.cityofnewyork.us/resource/c3uy-2p5r.csv"
+CPI_U_web <- "https://www.bls.gov/cpi/tables/supplemental-files/cpi-u-202401.xlsx"
+pverty_death_web <- "https://query.data.world/s/yqge54lqx4ymrqibgyw7h4bniwwidy?dws=00000"
+poverty_incd_web <-  "https://query.data.world/s/vu2r2wun6tgfmuuvdjxzb7pfve76j5?dws=00000"
+
+# to start with I load all the information from local computer
+#link to local files 
+airquality_loc <- "Data/Air_Quality_20240302.csv"
+CPI_U_loc <- "Data/cpi-u-202401.csv"
+poverty_death_loc <- "Data/death.csv"
+poverty_incd_loc <-  "Data/incd.csv"
+poverty_estimate <-  "Data/PovertyEstimates.csv"
+
+#create a vector with all file name to pass to a loop to quickly laod all files in one attemp using for loop
+file_list <- c(airquality_loc, CPI_U_loc, poverty_death_loc, poverty_incd_loc, poverty_estimate)
+
+DF_list <- list()
+
+#read data to dataframe 
+
+for (i in file_list) {
+  # Read CSV file into a data frame
+  df <- read.csv(i, na.strings = "", dec = ".", quote = "\"", check.names = FALSE, encoding = "UTF-8")
+  
+  # Create a list with file path and corresponding data frame
+  file_df_pair <- list(file_path = i, data_frame = df)
+  
+  # Append the list to DF_list
+  DF_list <- c(DF_list, list(file_df_pair))
+}
+
+#use a similar foor loop to present the imported data one at a time 
+
+#for (i in seq(length(DF_list))) {
+  
+#}
+
+#air quality was an easy read, 
+df_airquality <- DF_list[[1]][[2]]
+#change df to tibble 
+#sicne teh dat has a good quality, we can directly chagged it to tibble. 
+df_airquality <- dplyr::as_tibble(df_airquality)
+cat("\n", "Here is the head of the laoded data from:", DF_list[[1]][[1]] ,"\n")
+head(df_airquality)
+
+#CPI read, 
+# CPI is a complex database and required tidying, it has a initial 3 row of general informaiton, row 4 is the column name and row file is the cintinuation of th above column that has month infromaiton. It follows with two empty rows andthen data are stred. then it ends with an empty row and then some useful information. 
+#my goals it to import them and then clean the data later. 
+
+df_CPI <- DF_list[[2]][[2]]
+cat("\n", "Here is the head of the laoded data from:", DF_list[[2]][[1]] ,"\n")
+head(df_CPI)
+
+#Cancer-poverty read data 
+#I wull read the tow seperate dataset and inport each individually to a Df of its own 
+
+df_death <- DF_list[[3]][[2]]
+cat("\n", "Here is the head of the laoded data from:", DF_list[[3]][[1]] ,"\n")
+head(df_death)
+
+df_incd <- DF_list[[4]][[2]]
+cat("\n", "Here is the head of the laoded data from:", DF_list[[4]][[1]] ,"\n")
+head(df_incd)
+
+df_poverty <- DF_list[[5]][[2]]
+cat("\n", "Here is the head of the laoded data from:", DF_list[[5]][[1]] ,"\n")
+head(df_poverty)
+
+```
+
+At this point, all the 4 DFs are stored into R-Studio and names are
+assigned to them for further tidying and cleaning them up. In this step,
+we work with data to and I will be as descriptive as I can to explain
+the steps.
+
+## #2&3: Tidying and data clean up 
+
+As mentioned earlier, one of our primary goals is to **change the data
+format from wide to long** and ensure its cleanliness.
+
+Now that we’ve loaded the data, let’s leverage **dplyr** for the
+necessary transformations.
+
+**tidyr** comes to our rescue with its versatile functionalities,
+including reshaping data using **`pivot_longer`** and **`pivot_wider`**.
+It also provides tools for handling missing values (NA), either by
+removal or replacement. If you need a handy tidyr cheatsheet, just click
+[tidyr cheatsheet](https://rstudio.github.io/cheatsheets/tidyr.pdf).
+
+Our first step involves tidying the data. Upon close examination, I’ve
+identified several areas for improvement:
+
+-   Removal of NA values
+
+-   Elimination of empty columns
+
+-   identifying the header in the middle of rows
+
+-   Addressing column names that appear in unexpected places
+
+-   Disregarding unimportant footnotes
+
+-   Correcting any misread data
+
+-   changing format of the data to long
+
+-   separate cells data to observation values for season and year
+
+Finally, we’ll pivot and selectively separate columns to convert our
+data from wide to long format.
+
+### 2&3-1: Tidying the AirQuality DF 
+
+Let's focus our attention on the `df_airquality` dataframe. Upon
+reviewing the data, we find that our observations necessitate
+restructuring, tidying, and cleaning. While the data is relatively
+organized and tidy, areas for improvement can still be identified.
+
+The proposed improvements are as follows:
+
+-   There is a column called `Time Period` that needs to be separated
+    into seasons, annual averages, and years.
+
+-   Conduct data statistical analyses to evaluate data quality, examine
+    outliers, and assess data distribution.
+
+-   Normalize the data to facilitate comparison and analysis, especially
+    considering significant changes in values.
+
+To this end, I've created a new dataframe named `*_norm`. Analysis of
+the data statistics suggests that many columns exhibit right-skewed
+distributions with outliers, particularly in the upper range.
+Additionally, the `Ozone` relted values in `Data Value`column contain
+outliers on both the upper and lower ends. This can be seen in the box
+plots clearly.
+
+I also intend to add a new column to separate the values in
+`Time Period` into seasons and years. To achieve this, I utilize the
+`separate` function from `dplyr`. Firstly, I separate the `Time Period`
+based on the presence of a character followed by a space and a number,
+using the regex `"(?=\\d|-)"` to split the column into `Season` and
+`Year`. Then, I divide the `Year` into two additional columns,
+recognizing that the value could be either a character or a number
+separated by "-". This is accomplished with the simple regex "-",
+resulting in two new columns. Upon reviewing the data and assessing the
+output, it becomes apparent that some rows contain `NA` values, which
+need to be addressed.
+
+I begin by addressing the `NA` values in the `End Year` column. This
+occurs when the `Start Year` is a single value without a "-". In such
+cases, I assign the `End Year` to be the same as the `Start Year`.
+Subsequently, I replace the two-character values in the `End Year`
+column by appending "20" to them, thus converting them into full years.
+
+Finally, I convert the data in the two newly created columns from
+characters to integers. With these adjustments, the data appears
+organized, well-structured, and in wide and tidy format.
+
+```{r airquality_transformation, echo = TRUE}
+
+# Change the type to a tibble 
+df_airquality <- dplyr::as_tibble(df_airquality)
+head(df_airquality)
+
+test_df <- df_airquality %>% 
+  filter(Name == 'Annual vehicle miles traveled') %>% 
+  select('Data Value')
+  
+#Data nromalization
+
+distinc_test <-  df_airquality |> distinct(Name)
+
+#Fidn maximum of each set of data based grouped by name
+df_airquality_max <- df_airquality %>%
+  group_by(Name) %>%
+  summarise(
+    max_value      = max(`Data Value`)
+  )
+
+# Normalize the data by dividing each `Data Value` by its corresponding maximum value within each Name group
+
+df_airquality_norm <- df_airquality %>%
+  group_by(Name) %>%
+  mutate(maximum = max(`Data Value`)) %>%  # Calculate the maximum value
+  mutate(Data_Value_Normalized = `Data Value` / maximum) %>%  # Normalize them
+  ungroup() %>%  # Ungroup the data
+  select(-maximum)  # Remove the temporary column added
+
+  
+sum_stat_AQ <- df_airquality_norm %>%
+  group_by(Name) %>%
+  summarize(
+    mean     = mean(Data_Value_Normalized),
+    sd       = sd(Data_Value_Normalized),
+    median   = median(Data_Value_Normalized),
+    skewness = moments::skewness(Data_Value_Normalized),
+    kurtosis = moments::kurtosis(Data_Value_Normalized)
+  ) %>%
+  arrange(skewness, kurtosis)
+  
+(sum_stat_AQ)
+  
+#Let's also plot QQ and density distribution of data 
+
+df_airquality_norm$Name <- str_wrap(df_airquality_norm$Name, width = 20)  # Adjust width as needed
+
+# let's plot Q-Q s 
+ggplot(df_airquality_norm, aes(sample = Data_Value_Normalized)) +
+  geom_qq() +
+  facet_wrap(~Name)+
+  theme_minimal()+  # Optional: Adjust plot theme 
+  theme(strip.text = element_text(size = 8),
+        axis.text = element_text(size = 8))  # Adjust text size
+
+# Let's plot density histograms
+ggplot(df_airquality_norm, aes(x = Data_Value_Normalized, fill = Name)) +
+  geom_density(alpha = 0.5) + 
+  facet_wrap(~ Name, scales = "free") +  
+  theme_minimal() +
+  theme(strip.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        legend.text = element_text(size = 5) )  # Adjust text size
+  
+#plot box plot 
+ggplot(df_airquality_norm, aes(x = Data_Value_Normalized, fill = Name)) +
+  geom_boxplot(alpha = 0.5) + 
+  facet_wrap(~ Name, scales = "free") +  
+  theme_minimal() +
+  theme(strip.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        legend.text = element_text(size = 5) )  # Adjust text size
+
+
+#summary(df_airquality_norm$`Time Period`)
+
+df_airquality_norm %>% filter(is.na(`Time Period`)) %>%
+  summarize(
+    count = n()
+  )
+
+#Separate Time Period to two columns based on the text and date.   
+df_airquality_norm <- df_airquality_norm %>%
+  separate(`Time Period`, into = c("Season", "Year"), sep = " (?=\\d|-)", remove = FALSE)
+
+# Separate Year column into Start Year and End Year based on the '-' character
+df_airquality_norm <- df_airquality_norm %>%
+  separate(Year, into = c("Start Year", "End Year"), sep = "-", remove = FALSE)
+
+# If End Year is NA, set it to be the same as Start Year
+df_airquality_norm$`End Year`[is.na(df_airquality_norm$`End Year`)] <- df_airquality_norm$`Start Year`[is.na(df_airquality_norm$`End Year`)]
+
+df_airquality_norm$`End Year` <- ifelse(nchar(df_airquality_norm$`End Year`) == 2, paste0("20", df_airquality_norm$`End Year`), df_airquality_norm$`End Year`)
+
+# and finally we want to change the characters to number for columns Start Year and End Year. 
+
+df_airquality_norm$`End Year` <-  as.integer(df_airquality_norm$`End Year`)
+df_airquality_norm$`Start Year` <-  as.integer(df_airquality_norm$`Start Year`)
+
+```
+
+### #2&3-2: Tidting the  df_CPI
+
+This dataset appears messier than the previous one. Let’s break down the
+steps to tidy and organize it:
+
+1.  **Empty Rows and Column Placement:**
+
+    -   Initially, I noticed empty rows at the beginning of the imported
+        data.
+
+    -   The columns are oddly placed in the middle, with data appearing
+        on the second line.
+
+2.  **Step 1: Removing Empty Rows**
+
+    -   Our first action is to remove these two empty rows and create a
+        new data frame.
+
+3.  **Step 2: Identifying and Removing All Empty Rows**
+
+    -   Next, we’ll go **rowwise** to find and eliminate any remaining
+        empty rows from the database.
+
+4.  **Step 3: Transitioning from Wide to Long Format**
+
+    -   Now, let’s focus on changing the wide structure to a long
+        format.
+
+    -   Observing the data, we notice the following:
+
+        -   Two sets of data for each year, relevant to months.
+
+        -   Each set has columns repeated 13 times—one for each
+            month—under the “Unadjusted indexes” and “Seasonally
+            adjusted indexes.”
+
+        -   The data includes month associations, index report types,
+            and additional information.
+
+5.  **Actions for Long-Format Tidying:**
+
+    -   Combine the first three rows and add a delimiter (e.g., " \| ")
+        for later use with **`pivot_longer`**.
+
+    -   Remove these three rows to simplify the data frame.
+
+    -   Eliminate all columns with NA values (empty columns).
+
+    -   Create a long data frame by splitting the combined column names
+        into “Type,” “Month,” and “More.”
+
+6.  **Remaining Challenges:**
+
+    -   Although the new data frame is in a long format, it’s not fully
+        organized.
+
+    -   We need to identify different types of observations and arrange
+        them systematically.
+
+    -   Some type columns contain date data, and the “Month” column
+        seems to indicate a duration (start and end).
+
+    -   Consider using numeric representations (e.g., 1 for Jan) for
+        clarity.
+
+    -   Additionally, the “Values” column content isn’t numeric; we’ll
+        need to convert it.
+
+    -   Address any weird characters in the “Values” cells by replacing
+        them with NA or numeric values.
+
+    -    Additionally, it also may make sense to normalize the data.
+        (note doneyet)
+
+Finally, I created a new DF and plot some releavnt plots to show the
+trend of the indexes over 13 months. It is still required work, but I
+stop here to work on the third dataframe of mine.
+
+```{r CPI_transformation, echo = TRUE}
+
+# Let's start by removing the two empty rows. 
+#tibble initiation 
+
+df_CPI_new <- df_CPI[-c(1:2), ]
+
+# I need to remove the column if those all are NA. To do so, I use rowwise, do the sum on NA accrsoss the colu,n and if all are NA put TRUE at the newly created column of all_na and then remove it from the DF 
+
+# all column must have name in the DF, some does nto and I need to assign them a name 
+# Rename columns if they are not named
+#colnames(df_CPI_new) <- ifelse(colnames(df_CPI_new) == "", paste0("Col", 1:ncol(df_CPI_new)), colnames(df_CPI_new))
+
+# Combine the content of the first three rows into column names, we use " | " as a seperator to use later for using it to transform the data
+# Combine the content of the three first columns into combined column names
+
+colnames(df_CPI_new) <- paste(df_CPI_new[1,], df_CPI_new[2,], df_CPI_new[3,], sep = " | ") 
+
+# Test to esnure all are represented as expected to be used later 
+# Define the separator
+separator <- " \\| "
+
+# Split column names into three sections using the separator
+split_names <- strsplit(colnames(df_CPI_new), separator)
+
+# Identify column names that don't have three sections
+wrong_names <- which(sapply(split_names, length) != 3)
+
+
+# Remove the first three rows from the dataframe
+df_CPI_new <- df_CPI_new[-c(1:3), ]
+
+
+#Test if it works
+#df_CPI_na <- df_CPI_new %>%
+#  rowwise() %>%
+#  mutate(all_na = all(is.na(c_across())))
+
+
+df_CPI_new <- df_CPI_new %>%
+  rowwise() %>%
+  mutate(all_na = all(is.na(c_across()))) %>%
+  ungroup() %>%
+  filter(!all_na)
+
+#fidn the distinc Intent Level to use later for filtering and more 
+indent_levels <- df_CPI_new %>%
+  select(1) %>% 
+  na.omit() %>%
+  distinct()
+
+#Use pivot_longer to reform the data, we seperate them two three different columns based o nthe title we combined above
+df_CPI_new_L <- df_CPI_new %>%
+  pivot_longer(cols = 4:ncol(df_CPI_new)-1, 
+               names_to = c("Type", "Months", "More"), 
+               names_sep = " \\| ", 
+               values_to = "Values")
+
+#correc the first column name 
+colnames(df_CPI_new_L)[1:2] <-  c("Indent Level", "Expenditure category")
+
+#Transform Values to numeric 
+# Convert the Values column to numeric, but first changng everythign to charaters
+#df_CPI_new_L$Values <- as.numeric(as.character(df_CPI_new_L$Values))
+
+# There are some charaters that are not numeric like, I need to first remove them all, then convert to number,but before I need to change them all to a encoding UTF-8. 
+# Remove non-numeric characters from the Values column 
+# Convert the Values column to UTF-8 encoding
+df_CPI_new_L$Values <- iconv(df_CPI_new_L$Values, to = "UTF-8", sub = "byte")
+#Keep all with numebr like format and replace them with empty values 
+df_CPI_new_L$Values <- as.character(df_CPI_new_L$Values)
+
+# Clean up the Values column to remove non-numeric characters
+df_CPI_new_L$Values <- str_replace_all(df_CPI_new_L$Values, "[^0-9.-]", "")
+
+# Replace non-numeric values with NA
+#df_CPI_new_L$Values <- ifelse(grepl("^-?[0-9.]+$", df_CPI_new_L$Values), 
+#                              as.numeric(df_CPI_new_L$Values), 
+#                              NA)
+
+#df_CPI_new_L$Values <- gsub("[^0-9.-]", "", df_CPI_new_L$Values)
+df_CPI_new_L$Values <- as.numeric(as.character(df_CPI_new_L$Values))
+
+
+# find the distinc value in column types 
+DF_distincs <- df_CPI_new_L %>%
+  select(`Indent Level`, Type, Months, More) %>%
+  distinct() %>%
+  arrange()
+
+#let's explore the data 
+
+#start with summary 
+sum_test <- df_CPI_new_L %>% 
+  filter(Type == "Unadjusted indexes", `Indent Level` %in% c("0", "1")) %>%
+  group_by(`Expenditure category`) %>%
+  summarise(
+    n       = n(),
+    mean    = mean(Values, na.rm = T)
+  )
+
+print(sum_test)
+
+#Let's plot a simle line for the All items, Unadjsuted indexes 
+df_CPI_new_L %>% 
+  filter(Type == "Unadjusted indexes", `Indent Level` == "0", `Expenditure category` == "All items") %>%
+  arrange(Months) %>%
+  ggplot(aes(x = Months, y = Values)) +  
+  geom_point(alpha = 0.5, color = "blue") +  # Specify a color for the line
+  theme_minimal() +
+  theme(strip.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        legend.text = element_text(size = 5))
+
+#Export all Unadjsuted indexes to a new DF and then start explorign them, in thsi process we also chaneg the column month to seperate the Month number and year to plot some comaprative data 
+CPI_Unadjsuted_Monthly <- df_CPI_new_L %>% 
+  filter(Type == "Unadjusted indexes") %>%
+  group_by(`Expenditure category`)
+
+# to plot we want to seperate mpnth from year and add factors for months 
+CPI_Unadjsuted_Monthly$Months <- as.character(CPI_Unadjsuted_Monthly$Months)  # Convert to character (in case it's not already)
+
+CPI_Unadjsuted_Monthly$Month_numeric <- NA  # Create a new column for numeric month
+CPI_Unadjsuted_Monthly$Year_numeric <- NA   # Create a new column for numeric year
+
+# Loop through each row and extract the month and year
+for (i in 1:nrow(CPI_Unadjsuted_Monthly)) {
+  months <- unlist(strsplit(CPI_Unadjsuted_Monthly$Months[i], "[[:space:]]+"))  # Split the string by spaces
+  month <- match(sub("\\.$", "", months[1]), month.abb) # Get the numeric representation of the month
+  year <- as.numeric(months[2])         # Extract the year
+  
+  CPI_Unadjsuted_Monthly$Month_numeric[i] <- month
+  CPI_Unadjsuted_Monthly$Year_numeric[i] <- year
+}
+
+# Convert the month and year columns to factor for sake of plotting 
+CPI_Unadjsuted_Monthly$Month_numeric <- factor(CPI_Unadjsuted_Monthly$Month_numeric, levels = 1:12, labels = month.abb)
+CPI_Unadjsuted_Monthly$Year_numeric <- factor(CPI_Unadjsuted_Monthly$Year_numeric)
+
+# Reorder the levels of Month_numeric based on Year_numeric, since year alaos changed 
+CPI_Unadjsuted_Monthly$Month_numeric <- factor(CPI_Unadjsuted_Monthly$Month_numeric, levels = unique(CPI_Unadjsuted_Monthly$Month_numeric)[order(CPI_Unadjsuted_Monthly$Year_numeric)])
+
+# Plot the data
+CPI_Unadjsuted_Monthly %>% 
+  filter(`Indent Level` == "0", `Expenditure category` == "All items") %>%
+  ggplot(aes(x = Month_numeric, y = Values)) +  
+  geom_point(alpha = 0.5, color = "blue") +  # Specify a color for the line
+  theme_minimal() +
+  theme(strip.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        legend.text = element_text(size = 5))
+
+
+#plot a graph to compare the "Unadjusted Indexes" of level 0 and 1 across 12 months and compare them agaist the level 0 (All Items)
+
+CPI_Unadjsuted_Monthly %>% 
+  filter(`Indent Level` %in% c("0", "1")) %>%
+  group_by(`Expenditure category`) %>%
+  ggplot(aes(x = Month_numeric, y = Values, color = `Expenditure category`)) +  # Use color to identify them 
+  geom_point(alpha = 0.5) + 
+  theme_minimal() +
+  theme(strip.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        legend.text = element_text(size = 5))
+
+CPI_Unadjsuted_Monthly %>% 
+  filter(`Indent Level` %in% c("0", "1")) %>%
+  filter(`Expenditure category` %in% c("Energy", "Food", "Housing", "All items", "Services", "Medical care", "Fuels and utilities")) %>%
+  ggplot(aes(x = Month_numeric, y = Values, color = `Expenditure category`)) +  # Use color to identify them 
+  geom_point(alpha = 0.5) + 
+  theme_minimal() +
+  theme(strip.text = element_text(size = 8),
+        axis.text = element_text(size = 8),
+        legend.text = element_text(size = 8))
+
+
+
+```
+
+### #2&3-3: Tidying the df_death and df_incd
+
+These two DFs are pretty clean and organised. One can tell it but
+looking into the data and run some summary statistics.
+
+I start with some summary statistics to assess the quality of the data.
+Frist we remove the data in the DF that recent_trend_2 does not have any
+indication (rising, falling, or stable). and then figure out what is the
+trend in general is it positive or negative? The overall trend points
+out that the general trends among all the counties is falling.
+
+```{r tidy_cancer_poverty, echo=TRUE}
+
+# Let's first do some summary statistics and evalaute the data. 
+
+#Plot the recent trends and evalute if general trends if positive or negative 
+#remove the recent_trend_2 with no information 
+print("take a sneak pick of the DF")
+head(df_death,10)
+
+trend_summary <- df_death %>%
+  filter(recent_trend_2 %in% c("stable","falling","rising") ) %>%
+  select(recent_trend_2) %>%
+  summary(
+    n          = n(),
+    rising     = sum(recent_trend_2=="rising")
+    
+  )
+
+# Calculate summary statistics
+trend_summary <- df_death %>%
+  filter(recent_trend_2 %in% c("stable","falling","rising") ) %>%
+  summarise(
+    total   = n(),
+    rising  = sum(recent_trend_2 == "rising"),
+    falling = sum(recent_trend_2 == "falling"),
+    stable  = sum(recent_trend_2 == "stable"),
+    overall_trend = ifelse(rising > falling, "Rising Cancer Trend", ifelse(rising < falling, "Falling Cancer Trend", "Neutral Trend"))
+  )
+
+print(trend_summary)
+
+# Reshape the data to long format
+trend_summary_long <- tidyr::pivot_longer(trend_summary, cols = c(rising, falling, stable),names_to = "trend_type", values_to = "count")
+
+# Plot a bar chart
+ggplot(trend_summary_long, aes(x = trend_type, y = count, fill = trend_type)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "summary of the cancer cases in US", x = "General trends", y = "Counts" )
+
+
+#remove recent_trend_2 without any trend indication 
+df_death <- df_death %>%
+  filter(recent_trend_2 %in% c("stable","falling","rising") ) %>%
+  select(everything())
+
+# county has the state name at the end after a coma, i woudl like to seperate countu to countu and state 
+
+df_death <- df_death %>%
+  separate(county, sep = ",",
+into = c("county", "State"))
+
+#convert the data to numeric 
+# Convert columns 5 to 8 from character to numeric
+df_death <- df_death %>%
+  mutate_at(vars(5:8), as.numeric)
+
+# Convert columns 10 to 12 from character to numeric
+df_death <- df_death %>%
+  mutate_at(vars(10:12), as.numeric)
+
+state_sum <- df_death %>%
+  group_by(State) %>%
+  summarize(
+    death_sum     = sum(average_deaths_per_year, na.rm=TRUE)
+  )
+
+# Plot death rate by state
+ggplot(state_sum, aes(x = State, y = death_sum)) +
+  geom_bar(stat = "identity", fill = "plum") +
+  labs(x = "State", y = "Total Death Rate", title = "Death Rate by State") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
